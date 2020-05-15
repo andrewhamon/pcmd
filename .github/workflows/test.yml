@@ -1,0 +1,34 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    name: Test
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set $GOCACHE
+        run: echo "::set-env name=GOCACHE::$(go env GOCACHE)"
+
+      - name: Cache $GOCACHE
+        uses: actions/cache@v1
+        env:
+          cache-name: GOCACHE
+        with:
+          path: ${{ env.GOCACHE }}
+          key: ${{ runner.os }}-${{ env.cache-name }}
+
+      - name: Test
+        run: make -j 2 test

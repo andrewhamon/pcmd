@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# This is a script that runs a freshly compiled version of pcmd. This is useful
+# in dev so that it isn't necessary to remember to recompile before running, and
+# can be used in ssh config easily. Because Make only builds when dependencies
+# are newer than the binary, this script usually adds no preceptible delay.
+
+# Always set working dir to the pcmd project root, where the logs and lockfiles
+# will be gitignored.
+cd $(dirname $0)/..
+
+make --silent build
+build/pcmd $@

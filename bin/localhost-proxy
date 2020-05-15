@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# This is an example script that simulates a proxy command that has a lengthy
+# setup and teardown. You might imagine the setup is provisioning a new host to
+# ssh to, and the teardown might be snapshotting the host before terminating it.
+# Note that all logs are sent to stderr -- this is important because SSH will
+# expect stdin and stdout to be a TCP stream to an SSH server.
+
+>&2 echo "Simulating a lengthy setup..."
+sleep 5
+>&2 echo "Done!"
+sleep 0.5
+
+nc localhost 22
+
+>&2 echo "Simulating a lengthy teardown..."
+sleep 5
+>&2 echo "Done!"

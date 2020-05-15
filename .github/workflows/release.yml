@@ -1,0 +1,173 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  build:
+    name: Release
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Set up Go 1.14
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.14
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Build All
+        run: make -j 2 release
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload pcmd-darwin-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-darwin-amd64.zip
+          asset_name: pcmd-darwin-amd64.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-linux-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-linux-amd64.zip
+          asset_name: pcmd-linux-amd64.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-linux-386
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-linux-386.zip
+          asset_name: pcmd-linux-386.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-linux-arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-linux-arm64.zip
+          asset_name: pcmd-linux-arm64.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-linux-arm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-linux-arm.zip
+          asset_name: pcmd-linux-arm.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-freebsd-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-freebsd-amd64.zip
+          asset_name: pcmd-freebsd-amd64.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-freebsd-386
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-freebsd-386.zip
+          asset_name: pcmd-freebsd-386.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-freebsd-arm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-freebsd-arm.zip
+          asset_name: pcmd-freebsd-arm.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-openbsd-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-openbsd-amd64.zip
+          asset_name: pcmd-openbsd-amd64.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-openbsd-386
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-openbsd-386.zip
+          asset_name: pcmd-openbsd-386.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-openbsd-arm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-openbsd-arm.zip
+          asset_name: pcmd-openbsd-arm.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-netbsd-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-netbsd-amd64.zip
+          asset_name: pcmd-netbsd-amd64.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-netbsd-386
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-netbsd-386.zip
+          asset_name: pcmd-netbsd-386.zip
+          asset_content_type: application/zip
+
+      - name: Upload pcmd-netbsd-arm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./build/pcmd-netbsd-arm.zip
+          asset_name: pcmd-netbsd-arm.zip
+          asset_content_type: application/zip
