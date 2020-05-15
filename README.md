@@ -26,8 +26,44 @@ Specifically, `pcmd` provides the following features:
 - Optionally integrates with SSH `ControlMaster` config, for effortless
   connection sharing (See the Connection Sharing section below).
 
+## Compatibility and dependencies
+`pcmd` is cross-compiled to many targets, but has only been tested on macOS and
+Linux (Ubuntu). Additionally, `pcmd` requires `tail` and, depending
+on configuration, `ssh` to be available. These are extremely common.
+
 ## Install
-TBD
+
+### Pre-compiled binaries
+`pcmd` is available for download from the [releases
+page](https://github.com/andrewhamon/pcmd/releases/latest). You can also use the
+following snippet to install the latest release of `pcmd`, adjusting the values
+accordingly for your environment:
+
+```sh
+# Possible options: darwin,linux,freebsd,openbsd,netbsd
+# darwin == macOS
+OS=darwin
+
+# Possible options: amd64,386,arm,arm64(linux only)
+ARCH=amd64
+
+TARGET=pcmd-$OS-$ARCH
+
+# Download and unzip
+curl -OL https://github.com/andrewhamon/pcmd/releases/latest/download/$TARGET.zip
+unzip $TARGET.zip
+
+# Copy to somewhere on your path
+# replace ~/bin with something appropriate for your environment
+cp $TARGET/pcmd ~/bin
+```
+
+### Go install
+If you have Go installed, you can also install `pcmd` using `go get`:
+
+```sh
+go get github.com/andrewhamon/pcmd
+```
 
 ## Examples
 The easiest way to get started is to wrap your original `ProxyCommand` with
@@ -71,7 +107,7 @@ pcmd -lock -r %r -h %h original-proxy-command --original-arg foobar
 `%r` and `%h` are expanded by SSH automatically. See TOKENS in SSH_CONFIG(5) for
 more details.
 
-### Connection Sharing
+### Connection sharing
 SSH provides a native mechanism for connection sharing via the `ControlMaster`
 and `ControlPath` configuration options, which allows you to share a single
 connection for multiple SSH sessions (see SSH_CONFIG(5) for more details). One
@@ -82,15 +118,15 @@ waiting for a master. Instead, it runs both `ProxyCommand`s at the same time.
 
 `pcmd` can help with this, by doing two things:
 
-- Establishing a lock (using the `flock` syscall) to ensure only one version of
-  your `ProxyCommand` is running at a time.
+- Establishing a lock (using the `flock` system call) to ensure only one version
+  of your `ProxyCommand` is running at a time.
 - Waits for the `ControlMaster` to come up, if the lock can not be acquired.
   `pcmd` checks the status of the control master using `ssh user@host -O check`.
 
 To set up connection sharing, add the `-wait-for-master` flag, along with the
 `-r` and `-h` flags. For example:
 
-```
+```sh
 Host some-host
         ProxyCommand pcmd -wait-for-master -r %r -h %h original-proxy-command --original-arg foobar
         ControlMaster auto
