@@ -360,8 +360,8 @@ type Config struct {
 	// doesn't create the file specified with ControlPath until a connection is
 	// fully established. That means if you SSH to the same host twice, and the
 	// first invocation hasn't finished set up and created a master connection,
-	// SSH will hapily run two versions of your ProxyCommand in parallel. This can
-	// be problematic under circumstances.
+	// SSH will happily run two versions of your ProxyCommand in parallel. This
+	// can be problematic under circumstances.
 	//
 	// pcmd can ensure that only one version of ProxyCommand runs at a time. If
 	// pcmd detects that another version is running (determined using a lock file)
