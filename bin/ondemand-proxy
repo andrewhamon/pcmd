@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This script is a more realistic proxy command. It uses doctl to provision an
+# on-demand DigitalOcean VPS. Specifically, it:
+#
+#   - checks for an existing snapshot, and if found, revives it. Otherwise, it
+#     creates a brand new VPS.
+#   - waits for SSH to become available on port 22 of the VPS
+#   - proxies to stdio to port 22, using netcat
+#   - when proxying completes, shuts down the VPS, takes a snapshot, and finally
+#     destroys the VPS. That way, you don't get billed for idle compute! Very
+#     useful for development environments.
+#
+# To use, ensure the `doctl` and `nc` commands are available and run `doctl
+# auth`. You'll also need to make sure you've added your SSH key to your
+# DigitalOcean account.
+
+# Adjust these to your liking
+SIZE=s-1vcpu-1gb
+IMAGE=ubuntu-18-04-x64
+REGION=sfo3
+NAME=$1.$IMAGE.$REGION
+
+log(){
+  echo $@ >&2
+}
+
+# Run commands with stdout and stderr redirected to /dev/null
+shush(){
+  $@ &>/dev/null
+}
+
+fetch_ssh_keys(){
+  log "Fetching account SSH keys"
+
+  # Join ids with a comma, and delete the trailing comma
+  doctl compute ssh-key list --format ID --no-header | tr '\n' ',' | sed 's/,$//'
+}
+
+check_ssh_port(){
+  local host=$1
+
+  shush nc -z -w2 $host 22
+}
+
+# Even once a DigitalOcean VPS is provisioned, it usually doesn't accept SSH
+# connections for a bit. Check port 22 every 5 seconds, up to 10 times.
+wait_for_ssh_port(){
+  local host=$1
+  local n=0
+
+  log "Waiting for SSH to become available"
+
+  until [ "$n" -ge 10 ]
+  do
+    check_ssh_port $host && break
+    n=$((n+1)) 
+    sleep 5
+  done
+}
+
+# Find the most recent snapshot that includes the VPS name as the prefix of the
+# snapshot name
+lastest_snapshot_id(){
+  local prefix=$1
+
+  log "Checking for existing snapshot"
+  doctl compute snapshot list --format Name,ID --no-header | grep $prefix | sort | tail -1 | awk '{print $NF}'
+}
+
+create_and_wait(){
+  local image=$1
+
+  local ssh_keys=$(fetch_ssh_keys)
+
+  log "Creating instance $NAME"
+  doctl compute droplet create $NAME \
+    --image $image \
+    --region $REGION \
+    --size $SIZE \
+    --ssh-keys $ssh_keys \
+    --enable-monitoring \
+    --enable-private-networking \
+    --enable-ipv6 \
+    --format ID,PublicIPv4 \
+    --no-header \
+    --wait
+}
+
+shutdown_and_wait(){
+  local instance_id=$1
+
+  log "Shutting down"
+  shush doctl compute droplet-action shutdown $instance_id --wait
+}
+
+snapshot_and_wait(){
+  local instance_id=$1
+  local snapshot_name=$NAME-$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  log "Taking snapshot"
+  shush doctl compute droplet-action snapshot $instance_id --snapshot-name $snapshot_name --wait
+}
+
+delete(){
+  local instance_id=$1
+
+  log "Deleting instance"
+  shush doctl compute droplet delete --force $instance_id
+}
+
+main(){
+  local latest_snapshot_id=$(lastest_snapshot_id $NAME)
+  local create_result
+
+  if [[ "$latest_snapshot_id" =~ "null" ]]; then
+    create_result=$(create_and_wait $IMAGE)
+  else
+    log "Snapshot found: $latest_snapshot_id"
+    create_result=$(create_and_wait $latest_snapshot_id)
+  fi
+
+  local instance_id=$(echo $create_result | awk '{print $1}')
+  local instance_public_ip=$(echo $create_result | awk '{print $2}')
+  
+  wait_for_ssh_port $instance_public_ip
+
+  nc $instance_public_ip 22 || :
+
+  shutdown_and_wait $instance_id
+  snapshot_and_wait $instance_id
+  delete $instance_id
+
+  log "Done"
+}
+
+main
