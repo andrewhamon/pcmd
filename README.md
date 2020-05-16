@@ -1,7 +1,21 @@
 # pcmd
+
 `pcmd` is a small utility to make SSH `ProxyCommand` more powerful. It might be
 useful any time you have a `ProxyCommand` that involves a lengthy or expensive
 set-up or tear-down procedure.
+
+- [Rationale](#rationale)
+- [Compatibility and dependencies](#compatibility-and-dependencies)
+- [Installation](#installation)
+  - [Pre-compiled binaries](#pre-compiled-binaries)
+  - [Go get](#go-get)
+- [Examples](#examples)
+  - [Complete example: on-demand VPS with DigitalOcean](#complete-example-on-demand-vps-with-digitalocean)
+  - [Configurable grace period](#configurable-grace-period)
+  - [Preventing concurrent `ProxyCommand` invocations](#preventing-concurrent-proxycommand-invocations)
+  - [Connection sharing](#connection-sharing)
+
+## Rationale
 
 The primary use case of `pcmd` is to wrap a `ProxyCommand` that might need to
 perform non-trivial set-up or tear-down operations. For example, one might have
@@ -11,9 +25,10 @@ case, it is essential to a) not duplicate work and b) ensure that resources get
 cleaned up. Without `pcmd` it can be difficult to reliably meet those
 requirements.
 
-Complex proxy scripts such as those pose a few challenges:
+Here are some of the challenges I faced when implementing on-demand VPS
+provisioning in a `ProxyCommand`:
 
-1) The shutdown procedure might be rather lengthy. On some versions and
+1) Tear-down. The shutdown procedure might be rather lengthy. On some versions and
    configurations of SSH (like on macOS), as soon as the SSH connection is
    closed, a hangup signal is sent to the `ProxyCommand`, preventing any cleanup
    from occurring. That is bad because then you get billed for a VPS that you
@@ -54,11 +69,13 @@ Complex proxy scripts such as those pose a few challenges:
    you can monitor the progress of a lengthy set-up.
 
 ## Compatibility and dependencies
-`pcmd` is cross-compiled to many targets, but has only been tested on macOS and
-Linux (Ubuntu). Additionally, `pcmd` requires `tail` and, depending on
-configuration, `ssh` to be available. These are extremely common.
+`pcmd` is cross-compiled to [many
+targets](https://github.com/andrewhamon/pcmd/releases/latest), but has only been
+tested on macOS and Linux (Ubuntu 18.04). Additionally, `pcmd` requires the
+`tail` and, depending on configuration, `ssh` commands to be available. These
+are likely already installed on your system.
 
-## Install
+## Installation
 
 ### Pre-compiled binaries
 `pcmd` is available for download from the [releases
@@ -85,7 +102,7 @@ unzip $TARGET.zip
 cp $TARGET/pcmd ~/bin
 ```
 
-### Go install
+### Go get
 If you have Go installed, you can also install `pcmd` using `go get`:
 
 ```sh
@@ -115,13 +132,14 @@ has adequate time after the connection closes to perform cleanup.
 Included in this repo is an example bash script that uses `doctl` to create a
 VPS on the fly and proxy to it. The following is is the resulting SSH config,
 configured for connection sharing with `ControlMaster`. To use, you will need to
-ensure that the `ondemand-proxy` script is downloaded and available in your
-`$PATH` and that you have installed `doctl`.
+ensure that the `on-demand-proxy` script is downloaded and available in your
+`$PATH` and that you have [installed
+`doctl`](https://github.com/digitalocean/doctl#installing-doctl).
 
 ```
 Host ondemand.dev
         User root
-        ProxyCommand pcmd --wait-for-master -r %r -h %h -p %p ondemand-proxy %h
+        ProxyCommand pcmd --wait-for-master -r %r -h %h -p %p on-demand-proxy %h
         ControlMaster auto
         ControlPath ~/.ssh/%r@%h:%p.sock
 
