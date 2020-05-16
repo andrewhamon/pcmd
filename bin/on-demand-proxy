@@ -62,7 +62,7 @@ wait_for_ssh_port(){
 
 # Find the most recent snapshot that includes the VPS name as the prefix of the
 # snapshot name
-lastest_snapshot_id(){
+fetch_latest_snapshot(){
   local prefix=$1
 
   log "Checking for existing snapshot"
@@ -111,15 +111,18 @@ delete(){
 }
 
 main(){
-  local latest_snapshot_id=$(lastest_snapshot_id $NAME)
+  local latest_snapshot_id=$(fetch_latest_snapshot $NAME)
   local create_result
 
-  if [[ "$latest_snapshot_id" =~ "null" ]]; then
-    create_result=$(create_and_wait $IMAGE)
-  else
+  case $latest_snapshot_id in
+  (*[![:space:]]*)
     log "Snapshot found: $latest_snapshot_id"
     create_result=$(create_and_wait $latest_snapshot_id)
-  fi
+    ;;
+  (*)
+    log "Snapshot not found"
+    create_result=$(create_and_wait $IMAGE)
+  esac
 
   local instance_id=$(echo $create_result | awk '{print $1}')
   local instance_public_ip=$(echo $create_result | awk '{print $2}')
