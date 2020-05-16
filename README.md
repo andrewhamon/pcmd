@@ -129,11 +129,12 @@ This will continue to proxy as before but also ensures `original-proxy-command`
 has adequate time after the connection closes to perform cleanup.
 
 ### Complete example: on-demand VPS with DigitalOcean
-Included in this repo is an example bash script that uses `doctl` to create a
-VPS on the fly and proxy to it. The following is is the resulting SSH config,
-configured for connection sharing with `ControlMaster`. To use, you will need to
-ensure that the `on-demand-proxy` script is downloaded and available in your
-`$PATH` and that you have [installed
+Included in this repo is an [example bash
+script](https://github.com/andrewhamon/pcmd/blob/master/bin/on-demand-proxy)
+that uses `doctl` to create a VPS on the fly and proxy to it. The following is
+is the resulting SSH config, configured for connection sharing with
+`ControlMaster`. To use, you will need to ensure that the `on-demand-proxy`
+script is downloaded and available in your `$PATH` and that you have [installed
 `doctl`](https://github.com/digitalocean/doctl#installing-doctl).
 
 ```ssh-config
