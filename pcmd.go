@@ -44,9 +44,7 @@ func main() {
 		// require centralizing child process management, which doesn't seem worth
 		// it so far. For now, we simply trust that all blocking operations will
 		// cooperate and correctly implement the grace period logic.
-		sig := <-signals
-		fmt.Fprintf(os.Stderr, "Received %s signal, giving processes %d seconds to clean up...\n", sig, config.GracePeriod)
-
+		<-signals
 		cancel()
 	}()
 
@@ -71,8 +69,7 @@ func lockOrExpectControlMaster(ctx context.Context, config Config) {
 	if locked {
 		pipeToProxyCommand(ctx, config)
 	} else {
-		// Wait for control path, then try a nested ssh connection
-		fmt.Fprintf(os.Stderr, "Waiting for SSH ControlMaster...\n")
+		fmt.Fprintf(os.Stderr, "Waiting up to %d seconds for SSH ControlMaster\n", 2*time.Duration(config.GracePeriod))
 
 		cancelLogTail, err := tailLogFileToStdErr(config)
 		if err != nil {
@@ -80,10 +77,30 @@ func lockOrExpectControlMaster(ctx context.Context, config Config) {
 		}
 		defer cancelLogTail()
 
-		controlMasterIsUp := waitForControlMaster(config)
-		cancelLogTail()
+		masterIsUp, cancelMasterWait := waitForControlMaster(config)
 
-		if controlMasterIsUp {
+		lockAcquired, cancelLockWait := waitForLock(config)
+
+		timeout := time.After(2 * time.Duration(config.GracePeriod) * time.Second)
+
+		select {
+		// We acquired a lock, pipe to proxy command directly. This happens if we
+		// started during the teardown phase. The ControlMaster will never come up
+		// in that case, but we still have to wait for teardown to complete.
+		case <-lockAcquired:
+			cancelLogTail()
+			cancelMasterWait()
+			cancelLockWait()
+
+			pipeToProxyCommand(ctx, config)
+			return
+
+		// The ControlMaster came up, create a new nested SSH session
+		case <-masterIsUp:
+			cancelLogTail()
+			cancelMasterWait()
+			cancelLockWait()
+
 			sshPort := strconv.Itoa(config.SSHPort)
 			sshUserAtHost := fmt.Sprintf("%s@%s", config.SSHUser, config.SSHHost)
 			proxyTarget := fmt.Sprintf("localhost:%d", config.SSHPort)
@@ -91,12 +108,25 @@ func lockOrExpectControlMaster(ctx context.Context, config Config) {
 
 			cmd.Stdin = os.Stdin
 			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
+			cmd.Stderr = nil
 
 			cmd.Start()
 			cmd.Wait()
-		} else {
-			fmt.Fprintf(os.Stderr, "ControlMaster not detected\n")
+
+			return
+
+		case <-timeout:
+			cancelLogTail()
+			cancelMasterWait()
+			cancelLockWait()
+
+			fmt.Fprintf(os.Stderr, "Timeout waiting for ControlMaster\n")
+			os.Exit(1)
+
+		case <-ctx.Done():
+			cancelLogTail()
+			cancelMasterWait()
+			cancelLockWait()
 			os.Exit(1)
 		}
 	}
@@ -192,6 +222,7 @@ func pipeToProxyCommand(ctx context.Context, config Config) {
 	// forwarded to the interactive terminal (because its hella annoying to have
 	// things printed to a bash session after a command appears to be finished)
 CleanupAndWaitForGracePeriod:
+	fmt.Fprintf(os.Stderr, "Giving processes %d seconds to clean up\n", config.GracePeriod)
 	cancelLogTail()
 
 	stdinPipe.Close()
@@ -306,19 +337,66 @@ func tailLogFileToStdErr(config Config) (cancel func() error, err error) {
 	return cancel, nil
 }
 
-func waitForControlMaster(config Config) bool {
-	for attempts := 0; attempts < 400; attempts++ {
-		attempts++
+func waitForControlMaster(config Config) (<-chan struct{}, func()) {
+	done := make(chan struct{})
+	cancelChan := make(chan struct{})
 
-		success := controlMasterIsUp(config)
-
-		if success {
-			return success
-		}
-
-		time.Sleep(250 * time.Millisecond)
+	cancelFunc := func() {
+		close(cancelChan)
 	}
-	return false
+
+	go func() {
+		for {
+			success := controlMasterIsUp(config)
+
+			if success {
+				done <- struct{}{}
+				return
+			}
+
+			interval := time.After(250 * time.Millisecond)
+
+			select {
+			case <-interval:
+				// do nothing
+			case <-cancelChan:
+				return
+			}
+		}
+	}()
+
+	return done, cancelFunc
+}
+
+func waitForLock(config Config) (<-chan struct{}, func()) {
+	done := make(chan struct{})
+	cancelChan := make(chan struct{})
+
+	cancelFunc := func() {
+		close(cancelChan)
+	}
+
+	go func() {
+		for {
+			_, locked := flockPath(config.LockFilePath)
+
+			if locked {
+				done <- struct{}{}
+				return
+			}
+
+			interval := time.After(250 * time.Millisecond)
+
+			select {
+			case <-interval:
+				// do nothing
+			case <-cancelChan:
+				return
+			}
+		}
+	}()
+
+	return done, cancelFunc
 }
 
 func controlMasterIsUp(config Config) bool {
@@ -369,7 +447,7 @@ type Config struct {
 	// SSH connection
 	ExpectControlMaster bool
 
-	//Show the current version of PCMD
+	//Show the current version of pcmd
 	ShowVersion bool
 
 	// Derived options, calculated during parseConfig()
