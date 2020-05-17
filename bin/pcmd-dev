@@ -7,7 +7,7 @@
 
 # Always set working dir to the pcmd project root, where the logs and lockfiles
 # will be gitignored.
-cd $(dirname $0)/..
+workdir=$(dirname $0)/../.pcmd
 
 make --silent build
-build/pcmd $@
+build/pcmd -workdir $workdir $@

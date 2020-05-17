@@ -25,7 +25,9 @@ var (
 func main() {
 	config := parseConfig()
 	maybeShowVersionAndExit(config)
-	createAndChangeToWorkDir(config)
+	createWorkDir(config)
+
+	fmt.Fprintf(os.Stderr, "View logs at %s\n", config.LogFilePath)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -241,15 +243,8 @@ CleanupAndWaitForGracePeriod:
 	}
 }
 
-func createAndChangeToWorkDir(config Config) {
-	workDir := config.WorkDir
-	filesPath := filepath.Join(workDir, ".pcmd")
-
-	if err := os.MkdirAll(filesPath, 0755); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := os.Chdir(workDir); err != nil {
+func createWorkDir(config Config) {
+	if err := os.MkdirAll(config.WorkDir, 0755); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -465,7 +460,9 @@ func parseConfig() Config {
 
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
-	flagSet.StringVar(&config.WorkDir, "workdir", ".", "Working directory for lock files, logs, unix sockets, etc.")
+	tmpDir := filepath.Join(getTempDir(), "pcmd")
+
+	flagSet.StringVar(&config.WorkDir, "workdir", tmpDir, "Working directory for lock files, logs, unix sockets, etc.")
 	flagSet.IntVar(&config.GracePeriod, "grace-period", 300, "Number of seconds to allow for cleanup once the proxying is complete")
 	flagSet.BoolVar(&config.Lock, "lock", false, "Only allow one instance of ProxyCommand to run at a time. Implied by -control-path")
 	flagSet.StringVar(&config.SSHUser, "r", "", "The SSH remote user. This should be set to %r. See TOKENS in SSH_CONFIG(5) for more details.")
@@ -506,7 +503,7 @@ func parseConfig() Config {
 }
 
 func baseName(config Config) (bn string) {
-	bn = ".pcmd/pcmd"
+	bn = filepath.Join(config.WorkDir, "pcmd")
 
 	if config.SSHUser != "" {
 		bn = bn + "." + config.SSHUser
@@ -528,4 +525,12 @@ func ensureSSHConfigPresent(config Config) {
 		fmt.Fprintf(os.Stderr, "If using -lock or -wait-for-master, you muse also provide -r and -h (and -p if different than 22). pcmd uses this information to generate a unique path to a lock file.\n")
 		os.Exit(1)
 	}
+}
+
+func getTempDir() string {
+	envTempDir, exists := os.LookupEnv("TMPDIR")
+	if exists {
+		return envTempDir
+	}
+	return "/tmp"
 }
